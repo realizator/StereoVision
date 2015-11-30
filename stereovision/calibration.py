@@ -152,11 +152,11 @@ class StereoCalibrator(object):
         ret, corners = cv2.findChessboardCorners(temp,
                                                  (self.rows, self.columns))
         if not ret:
-            raise ChessboardNotFoundError("No chessboard could be found.")
+            return (-1, corners)
         cv2.cornerSubPix(temp, corners, (11, 11), (-1, -1),
                          (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
                           30, 0.01))
-        return corners
+        return (1, corners)
 
     def _show_corners(self, image, corners):
         """Show chessboard corners found in image."""
@@ -205,15 +205,23 @@ class StereoCalibrator(object):
         The image pair should be an iterable composed of two CvMats ordered
         (left, right).
         """
-        side = "left"
-        self.object_points.append(self.corner_coordinates)
-        for image in image_pair:
-            corners = self._get_corners(image)
+        ret, cornersL = self._get_corners(image_pair[0])
+        if ret == 1:
             if show_results:
-                self._show_corners(image, corners)
-            self.image_points[side].append(corners.reshape(-1, 2))
-            side = "right"
-            self.image_count += 1
+                self._show_corners(image_pair[0], cornersL)
+            ret, cornersR = self._get_corners(image_pair[1])
+            if ret == 1:
+                self.object_points.append(self.corner_coordinates)
+                if show_results:
+                    self._show_corners(image_pair[1], cornersR)
+                self.image_points["left"].append(cornersL.reshape(-1, 2))
+                self.image_count += 1
+                self.image_points["right"].append(cornersR.reshape(-1, 2))
+                self.image_count += 1
+            else:
+                print ('Pair ignored - no chessboard found on Right image')
+        else:
+            print ('Pair ignored - no chessboard found on Left image') 
 
     def calibrate_cameras(self):
         """Calibrate cameras based on found chessboard corners."""
